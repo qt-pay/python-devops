@@ -1,0 +1,8 @@
+- hosts: db
+  gather_facts: false
+  tasks:
+    - name: data_min sleep
+      shell: sleep "{{ time }}"
+    - name: get the data
+      shell: "{{ command }}"
+
