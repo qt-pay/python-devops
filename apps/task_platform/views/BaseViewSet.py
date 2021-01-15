@@ -1,12 +1,12 @@
-from utils.rest_framework.base_response import new_response
+
+from django.conf import settings
 from celery.result import AsyncResult
 from my_celery.run import app
+from ..models import TaskHistory, ScriptProject
 from utils.rest_framework.base_view import NewModelViewSet
-from ..models import TaskHistory, TaskRecycle
-from apps.rbac.auth.jwt_auth import create_token, analysis_token
-from django.conf import settings
 from utils.config.get_config_value import get_value
 from utils.script.random_str import random_str
+from apps.rbac.auth.jwt_auth import analysis_token
 import os
 import tarfile
 import zipfile
@@ -142,63 +142,90 @@ class Base(NewModelViewSet):
         }
         TaskHistory.objects.create(**log_dic)
 
-    def save_file(self, type, script_file, project):
-        global abs_file_path
+    def save_file(self, type, data):
+        res_dict = {'status': True, 'data': ''}
+        script_file = data['sctiptFile']
         try:
-            res_dict = {'status': True, 'data': ''}
             if type == 'script':
-                if script_file:
-                    if script_file.name.endswith('.sh') or script_file.name.endswith('.py'):
-                        abs_file_path = os.path.join(settings.TASK_SCRIPT_DIR, project, script_file.name)
-                        if os.path.exists(abs_file_path):
-                            res_dict['status'] = False
-                            res_dict['data'] = '脚本文件已经存在请检查后在上传!。'
-                            return res_dict
-                    else:
-                        res_dict['status'] = False
-                        res_dict['data'] = '上传文件格式错误, 只支持.sh/.py结尾脚本。'
-                        return res_dict
-            elif type == 'playbook':
-                print(script_file.name)
-                if script_file.name.endswith('.yaml'):
-                    abs_file_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project, script_file.name)
+                project_obj = ScriptProject.objects.filter(id=data['project']).first()
+                if script_file.name.endswith('.sh') or script_file.name.endswith('.py'):
+                    abs_file_path = os.path.join(settings.TASK_SCRIPT_DIR, project_obj.path, script_file.name)
                     if os.path.exists(abs_file_path):
                         res_dict['status'] = False
-                        res_dict['data'] = f'{project} 项目中已经存在此剧本请检查后重试!'
-                        return res_dict
-                elif script_file.name.endswith('.tar.gz'):
-                    abs_file_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project, script_file.name)
-                    print(abs_file_path)
-                    if os.path.exists(abs_file_path.split('.tar.gz')[0]):
-                        res_dict['status'] = False
-                        res_dict['data'] = f'{project} 项目中已经存在此角色包请检查后重试!'
-                        return res_dict
-                elif script_file.name.endswith('.zip'):
-                    abs_file_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project, script_file.name)
-                    if os.path.exists(abs_file_path.split('.zip')[0]):
-                        res_dict['status'] = False
-                        res_dict['data'] = f'{project} 项目中已经存在此角色包请检查后重试!'
+                        res_dict['data'] = '脚本文件已经存在请检查后在上传!。'
                         return res_dict
                 else:
                     res_dict['status'] = False
-                    res_dict['data'] = 'PlayBook 文件上传暂只支持，.yaml/.zip/.tar.gz结尾文件。'
+                    res_dict['data'] = '上传文件格式错误, 只支持.sh/.py结尾脚本。'
                     return res_dict
-            # 保存压缩包或者文件
             with open(abs_file_path, 'wb') as f:
                 for chunk in script_file.chunks():
                     f.write(chunk)
                 f.flush()
-            if abs_file_path.endswith('.tar.gz'):
-                return self.__un_tar(abs_file_path)
-            if abs_file_path.endswith('.zip'):
-                return self.__un_zip(abs_file_path)
-            # 文件直接返回file名
             res_dict['data'] = script_file.name
-            return res_dict
         except Exception as e:
+            if os.path.isfile(abs_file_path):
+                os.remove(abs_file_path)
             res_dict['status'] = False
             res_dict['data'] = str(e)
-            return res_dict
+        return res_dict
+    # def save_file(self, type, data, project):
+    #     global abs_file_path
+    #     try:
+    #         res_dict = {'status': True, 'data': ''}
+    #         if type == 'script':
+    #             project_obj = ScriptProject.objects.filter(id=)
+    #             if script_file.name.endswith('.sh') or script_file.name.endswith('.py'):
+    #                     abs_file_path = os.path.join(settings.TASK_SCRIPT_DIR, project, script_file.name)
+    #                     if os.path.exists(abs_file_path):
+    #                         res_dict['status'] = False
+    #                         res_dict['data'] = '脚本文件已经存在请检查后在上传!。'
+    #                         return res_dict
+    #                 else:
+    #                     res_dict['status'] = False
+    #                     res_dict['data'] = '上传文件格式错误, 只支持.sh/.py结尾脚本。'
+    #                     return res_dict
+    #         # elif type == 'playbook':
+    #         #     print(script_file.name)
+    #         #     if script_file.name.endswith('.yaml'):
+    #         #         abs_file_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project, script_file.name)
+    #         #         if os.path.exists(abs_file_path):
+    #         #             res_dict['status'] = False
+    #         #             res_dict['data'] = f'{project} 项目中已经存在此剧本请检查后重试!'
+    #         #             return res_dict
+    #         #     elif script_file.name.endswith('.tar.gz'):
+    #         #         abs_file_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project, script_file.name)
+    #         #         print(abs_file_path)
+    #         #         if os.path.exists(abs_file_path.split('.tar.gz')[0]):
+    #         #             res_dict['status'] = False
+    #         #             res_dict['data'] = f'{project} 项目中已经存在此角色包请检查后重试!'
+    #         #             return res_dict
+    #         #     elif script_file.name.endswith('.zip'):
+    #         #         abs_file_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project, script_file.name)
+    #         #         if os.path.exists(abs_file_path.split('.zip')[0]):
+    #         #             res_dict['status'] = False
+    #         #             res_dict['data'] = f'{project} 项目中已经存在此角色包请检查后重试!'
+    #         #             return res_dict
+    #         #     else:
+    #         #         res_dict['status'] = False
+    #         #         res_dict['data'] = 'PlayBook 文件上传暂只支持，.yaml/.zip/.tar.gz结尾文件。'
+    #         #         return res_dict
+    #         # # 保存压缩包或者文件
+    #         # with open(abs_file_path, 'wb') as f:
+    #         #     for chunk in script_file.chunks():
+    #         #         f.write(chunk)
+    #         #     f.flush()
+    #         # if abs_file_path.endswith('.tar.gz'):
+    #         #     return self.__un_tar(abs_file_path)
+    #         # if abs_file_path.endswith('.zip'):
+    #         #     return self.__un_zip(abs_file_path)
+    #         # # 文件直接返回file名
+    #         # res_dict['data'] = script_file.name
+    #         return res_dict
+    #     except Exception as e:
+    #         res_dict['status'] = False
+    #         res_dict['data'] = str(e)
+    #         return res_dict
 
     def __un_tar(self, abs_package):
         res_dict = {'status': True, 'data': ''}

@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     'apps.api.apps.ApiConfig',
     'apps.ansible.apps.AnsibleConfig',
     'apps.system.apps.SystemConfig',
-    'apps.task.apps.TaskConfig'
+    'apps.task.apps.TaskConfig',
+    'apps.task_platform.apps.TaskPlatformConfig'
 ]
 
 MIDDLEWARE = [
@@ -163,7 +164,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'upload/')
 MEDIA_URL = '/upload/' #
 # 指定使用 cem.UserProfile 代替默认的 auth_user 表
 AUTH_USER_MODEL = 'user.UserProfile'
-TASK_BASE_DIR = os.path.join(BASE_DIR, 'tasks')
+DATA_BASE_DIR = os.path.join(BASE_DIR, 'data')
+TASK_BASE_DIR = os.path.join(DATA_BASE_DIR, 'tasks')
 TASK_RECYCLE_BIN = os.path.join(TASK_BASE_DIR, 'recycle_bin')
 TASK_SCRIPT_DIR = os.path.join(TASK_BASE_DIR, 'scripts')
 TASK_PLAYBOOK_DIR = os.path.join(TASK_BASE_DIR, 'playbook')
