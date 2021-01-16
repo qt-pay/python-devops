@@ -1,7 +1,8 @@
 from django.db import models
 
 # Create your models here.
-__all__ = ['ScriptProject', 'ScriptFile', 'TaskHistory']
+__all__ = ['ScriptProject', 'ScriptFile', 'AnsibleProject', 'AnsiblePlaybook', 'AnsibleParameter', 'TaskRecycle',
+           'TaskHistory']
 
 
 class ScriptProject(models.Model):

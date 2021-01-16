@@ -1,4 +1,3 @@
-
 from django.conf import settings
 from rest_framework.decorators import action
 from .BaseViewSet import Base
@@ -38,7 +37,8 @@ class ScriptFileViewSet(Base):
     def update(self, request, *args, **kwargs):
 
         try:
-            project_obj = ScriptProject.objects.filter(id=request.data.get('project')).first()
+            data = request.data
+            project_obj = ScriptProject.objects.filter(id=data['project']).first()
             partial = kwargs.pop('partial', False)
             instance = self.get_object()
             old_project_path = instance.project.path
@@ -47,7 +47,8 @@ class ScriptFileViewSet(Base):
                 return new_response(code=10200, data='脚本已经存在', message='新项目中已经存在同名脚本，请检查后重试。')
             shutil.move(os.path.join(settings.TASK_SCRIPT_DIR, old_project_path, instance.file_name),
                         os.path.join(settings.TASK_SCRIPT_DIR, new_project_path, instance.file_name))
-            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            data['src_user'] = self.get_user(request)
+            serializer = self.get_serializer(instance, data=data, partial=partial)
             serializer.is_valid(raise_exception=True)
             serializer.save()
             if getattr(instance, '_prefetched_objects_cache', None):
@@ -83,6 +84,7 @@ class ScriptFileViewSet(Base):
                 os.remove(old_abs_file)
                 file_obj = pathlib.Path(new_abs_file)
                 instance.file_name = file_name
+                instance.src_user = self.get_user(request)
                 instance.save()
                 file_obj.write_text(content, encoding='utf-8')
                 return new_response(data='文件更新成功')
