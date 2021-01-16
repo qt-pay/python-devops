@@ -11,7 +11,7 @@ class AnsibleProjectViewSet(Base):
     serializer_class = AnsibleProjectSerializer
     ordering_fields = ('id', 'name',)
     search_fields = ('name', 'path', 'online_status')
-    filter_fields = ('id',)
+    filter_fields = ('id', 'online_status')
 
     def create(self, request, *args, **kwargs):
         try:

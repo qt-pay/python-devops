@@ -9,7 +9,7 @@ router.register(r'project', task_project.TaskProjectViewSet, )
 router.register(r'ansible-project', ansible_project.AnsibleProjectViewSet, )
 router.register(r'ansible-playbook', ansible_playbook.AnsiblePlaybookViewSet, )
 router.register(r'ansible-extravars', ansible_extravars.AnsibleExtravarsViewSet, )
-router.register(r'ansible-recycle-bin', recycle_bin.TaskRecycleViewSet, )
+# router.register(r'ansible-recycle-bin', recycle_bin.TaskRecycleViewSet, )
 # router.register(r'crontab', task_crontab.CrontabTsask, )
 
 urlpatterns = [

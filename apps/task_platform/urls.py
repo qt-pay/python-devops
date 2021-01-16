@@ -1,17 +1,16 @@
 from rest_framework import routers
+from .views import script_project, script_file, ansible_project, ansible_playbook, ansible_parameter, task_recycle
 from django.urls import path, include
-from .views import script_project, script_file, ansible_project, ansible_playbook
 
 router = routers.DefaultRouter()
 
 # 脚本库相关URL
-router.register(r'script-project', script_project.ScriptProjectViewSet, )
-
-router.register(r'script-file', script_file.ScriptFileViewSet, )
-router.register(r'ansible-project', ansible_project.AnsibleProjectViewSet, )
-router.register(r'ansible-playbook', ansible_playbook.AnsiblePlaybookViewSet, )
-# router.register(r'ansible-extravars', ansible_extravars.AnsibleExtravarsViewSet, )
-# router.register(r'ansible-recycle-bin', recycle_bin.TaskRecycleViewSet, )
+router.register(r'script-project', script_project.ScriptProjectViewSet)
+router.register(r'script-file', script_file.ScriptFileViewSet)
+router.register(r'ansible-project', ansible_project.AnsibleProjectViewSet)
+router.register(r'ansible-playbook', ansible_playbook.AnsiblePlaybookViewSet)
+router.register(r'ansible-parameter', ansible_parameter.AnsibleParameterViewSet)
+router.register(r'recycle', task_recycle.TaskRecycleViewSet)
 # # router.register(r'crontab', task_crontab.CrontabTsask, )
 #
 # urlpatterns = [
@@ -21,5 +20,3 @@ router.register(r'ansible-playbook', ansible_playbook.AnsiblePlaybookViewSet, )
 #
 # ]
 urlpatterns = router.urls
-
-print(urlpatterns)

@@ -21,7 +21,7 @@ class ScriptFileViewSet(Base):
         try:
             data = request.data
             print(data)
-            save_file_info = self.save_file('script', data)
+            save_file_info = self.script_save(data)
             if not save_file_info['status']:
                 return new_response(code=10200, data='数据保存失败', message=save_file_info['data'])
             data['file_name'] = save_file_info['data']
