@@ -1,0 +1,7 @@
+- hosts: db
+  gather_facts: false
+  tasks:
+    - name: data_min sleep
+      shell: sleep 1
+    - name: get the data
+      shell: date

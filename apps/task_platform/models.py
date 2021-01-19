@@ -2,7 +2,7 @@ from django.db import models
 
 # Create your models here.
 __all__ = ['ScriptProject', 'ScriptFile', 'AnsibleProject', 'AnsiblePlaybook', 'AnsibleParameter', 'TaskRecycle',
-           'TaskHistory']
+           'TaskHistory', 'TaskCrontab']
 
 
 class ScriptProject(models.Model):
@@ -96,6 +96,29 @@ class AnsibleParameter(models.Model):
         verbose_name_plural = 'a任务参数'
 
 
+# 定时任务扩展
+class TaskCrontab(models.Model):
+    name = models.CharField(verbose_name="定时任务名称", max_length=32)
+    task_id = models.CharField(verbose_name='定时任务任务ID', max_length=128)
+    task_status = models.BooleanField(default=True)
+    run_type = models.CharField(verbose_name='执行方式', max_length=128)
+    task_lib = models.CharField(verbose_name='任务类型', max_length=128)
+    project = models.CharField(verbose_name='项目名称', max_length=128)
+    task_hosts = models.TextField(verbose_name='主机列表', )
+    task_file = models.CharField(verbose_name='执行脚本', max_length=128)
+    hosts_file = models.CharField(verbose_name='hosts文件', max_length=128)
+    task_args = models.CharField(verbose_name='参数', max_length=128)
+    remarks = models.TextField(verbose_name="定时任务备注", )
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'task_platform_crontab'
+        verbose_name = '定时任务'
+        verbose_name_plural = '定时任务'
+
+
 # 回收站
 RecycleTaskType = ((0, 'script'), (1, 'playbook'))
 
@@ -119,7 +142,7 @@ class TaskRecycle(models.Model):
 
 
 # 历史任务
-HistoryTaskType = ((0, '脚本任务'), (1, '剧本任务'), (2, '定时任务'))
+HistoryTaskType = ((0, '脚本任务'), (1, '剧本任务'), (2, '定时任务'), (3, '中间调度'))
 HistoryRunType = ((0, 'ansible'), (1, 'ssh'),)
 
 

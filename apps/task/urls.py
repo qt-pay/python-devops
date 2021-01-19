@@ -15,6 +15,7 @@ router.register(r'ansible-extravars', ansible_extravars.AnsibleExtravarsViewSet,
 urlpatterns = [
     path('submit-playbook', task_submit.RunPlaybook.as_view({'post':'post'})),
     path('crontab', task_crontab.CrontabTsaskView.as_view({ 'post': 'create', })),
+    path('hosts-group', task_crontab.CrontabTsaskView.as_view({ 'post': 'create', })),
     # path('script/exec_cmd/', task_script.TaskScriptViewSet.as_view({'post': 'exec_cmd'})),
 
 ]

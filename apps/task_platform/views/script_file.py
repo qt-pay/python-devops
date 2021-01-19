@@ -13,14 +13,13 @@ import shutil
 class ScriptFileViewSet(Base):
     queryset = ScriptFile.objects.all().order_by('id')
     serializer_class = ScriptFileSerializer
-    ordering_fields = ('id', 'script_filename',)
+    ordering_fields = ('id', 'name',)
     search_fields = ('name', 'file_name', 'exec_unm', 'src_user')
     filter_fields = ('id', 'project')
 
     def create(self, request, *args, **kwargs):
         try:
             data = request.data
-            print(data)
             save_file_info = self.script_save(data)
             if not save_file_info['status']:
                 return new_response(code=10200, data='数据保存失败', message=save_file_info['data'])

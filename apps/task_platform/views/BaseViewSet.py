@@ -1,7 +1,7 @@
 from django.conf import settings
 from celery.result import AsyncResult
 from my_celery.run import app
-from ..models import TaskHistory, ScriptProject, AnsibleProject
+from ..models import TaskHistory, ScriptProject, AnsibleProject, AnsibleParameter
 from utils.rest_framework.base_view import NewModelViewSet
 from utils.config.get_config_value import get_value
 from utils.script.random_str import random_str
@@ -14,22 +14,37 @@ import shutil
 
 class Base(NewModelViewSet):
 
-    def get_abs_file(self, data):
-        res = {'status': True, 'data': ''}
-        if data['task_lib'] == 'script':
-            res['data'] = os.path.join(settings.TASK_SCRIPT_DIR, data['task_project'], data['task_file'])
-        elif data['task_lib'] == 'playbook':
-            if len(data['task_file'].split('/')) < 2:
-                res['data'] = os.path.join(settings.TASK_PLAYBOOK_DIR, data['task_project'], data['task_file'])
-            else:
-                res['data'] = os.path.join(settings.TASK_PLAYBOOK_DIR, data['task_project']) + data['task_file']
+    def async_ssh_cmd(self, abs_file, data):
+        list = []
+        ramdom_str = random_str()
+        ansible = get_value("ansible", "abs_ansible_command")
+        remote_file_path = f'/tmp/{os.path.basename(abs_file)}-{ramdom_str}'
+        copy_file_cmd = f'{ansible} {data["middle_host"][0]} -m copy -a "src={abs_file} dest={remote_file_path} mode=0777"'
+        if abs_file.endswith('.sh'):
+            list.append(
+                f'''ansible {",".join(data["target_host"])} -m script -a "{remote_file_path} {data["task_args"]}" && rm -rf {remote_file_path} ''')
         else:
-            res['status'] = False
-            res['data'] = '脚本库类型未定义！'
-        if not os.path.isfile(res['data']):
-            res['status'] = False
-            res['data'] = '脚本文件找不到， 请检查项目及文件绝对路径！'
-        return res
+            if not data["task_args"]:
+                list.append(f'"ansible-playbook {remote_file_path} -v && rm -rf {remote_file_path}"')
+            else:
+                list.append(
+                    f'''ansible-playbook {remote_file_path} -v -e {data["task_args"]} && rm -rf {remote_file_path}''')
+        list.append(remote_file_path)
+        return list
+
+    def async_script_cmd(self, abs_file, data):
+        ramdom_str = random_str()
+        ansible = get_value("ansible", "abs_ansible_command")
+        remote_file_path = f'/tmp/{os.path.basename(abs_file)}-{ramdom_str}'
+        copy_file_cmd = f'{ansible} {data["middle_host"][0]} -m copy -a "src={abs_file} dest={remote_file_path} mode=0777"'
+        if abs_file.endswith('.sh'):
+            remote_cmd = f'''{ansible} {data["middle_host"][0]} -m shell -a 'ansible {",".join(data["target_host"])} -m script -a "{remote_file_path} {data["task_args"]}" && rm -rf {remote_file_path}' '''
+        else:
+            if not data["task_args"]:
+                remote_cmd = f'{ansible} {data["middle_host"][0]} -m shell -a "ansible-playbook {remote_file_path} -v && rm -rf {remote_file_path}"'
+            else:
+                remote_cmd = f'''{ansible} {data["middle_host"][0]} -m shell -a 'ansible-playbook {remote_file_path} -v -e {data["task_args"]} && rm -rf {remote_file_path}' '''
+        return f'{copy_file_cmd}&&{remote_cmd}'
 
     def ssh_cmd(self, abs_file_path, data):
         list = []
@@ -39,7 +54,7 @@ class Base(NewModelViewSet):
         ''' 调用 celery paramiko'''
         if file_name.endswith('.sh'):
             command = f'bash {remote_file_path}  {data["task_args"]} && rm -rf {remote_file_path}'
-        else:
+        elif file_name.endswith('.py'):
             command = f'python {remote_file_path} {data["task_args"]} && rm -rf {remote_file_path}'
         list.append(command)
         list.append(remote_file_path)
@@ -49,16 +64,15 @@ class Base(NewModelViewSet):
         ansible = get_value("ansible", "abs_ansible_command")
         ansible_playbook = get_value("ansible", "abs_playbook_command")
         if abs_file_path.endswith('.sh'):
-            return f"{ansible} {','.join(data['task_hosts'])} -m script -a '{abs_file_path} {data['task_args']}'"
+            return f"{ansible} {','.join(data['task_host_list'])} -m script -a '{abs_file_path} {data['task_args']}'"
         elif abs_file_path.endswith('.py'):
             ramdom_str = random_str()
             file_name = abs_file_path.split('/')[-1]
             remote_file_path = f'/tmp/{file_name}-{ramdom_str}'
-            copy_file_cmd = f'ansible {",".join(data["task_hosts"])} -m copy -a "src={abs_file_path} dest={remote_file_path} mode=766" '
-            exec_cmd = f'ansible {",".join(data["task_hosts"])} -m shell -a "chdir=/tmp/ .{remote_file_path} {data["task_args"]} && rm -f {remote_file_path}"  '
+            copy_file_cmd = f'ansible {",".join(data["task_host_list"])} -m copy -a "src={abs_file_path} dest={remote_file_path} mode=766" '
+            exec_cmd = f'ansible {",".join(data["task_host_list"])} -m shell -a "chdir=/tmp/ .{remote_file_path} {data["task_args"]} && rm -f {remote_file_path}"  '
             return f'{copy_file_cmd} && {exec_cmd}'
         elif abs_file_path.endswith('yaml') or abs_file_path.endswith('yml'):
-            print(abs_file_path)
             if data['hosts_file']:
                 if os.path.isfile(get_value('ansible', 'ansible_host_path')):
                     hosts_file_path = get_value('ansible', 'ansible_host_path')
@@ -76,40 +90,29 @@ class Base(NewModelViewSet):
                 else:
                     return f'{ansible_playbook} {abs_file_path} -v -i {hosts_file_path} -e {data["task_args"]}'
 
-    def cmd(self, type, data):
+    def playbook_cmd(self, abs_file, data):
         res = {'status': True, 'data': '', 'script_file': ''}
         try:
-            if type == 'playbook':
-                playbook_command = get_value("ansible", "abs_playbook_command")
-                print(data)
-                abs_file = self.__abs_file(type, data['project'], data['file_name'])
-                if data['hosts']:
-                    if os.path.isfile(get_value('ansible', 'ansible_host_path')):
-                        hosts_file_path = get_value('ansible', 'ansible_host_path')
-                    else:
-                        hosts_file_path = os.path.join(get_value('ansible', 'ansible_host_path'), data['hosts'])
+            playbook_command = get_value("ansible", "abs_playbook_command")
+            if data['host_file']:
+                if os.path.isfile(get_value('ansible', 'ansible_host_path')):
+                    hosts_file_path = get_value('ansible', 'ansible_host_path')
                 else:
-                    hosts_file_path = data['hosts']
-                if os.path.isfile(abs_file):
-                    res['data'] = abs_file
-                    if not hosts_file_path and not data['vers']:
-                        res['data'] = f'{playbook_command} {abs_file} -v  '
-                    elif not hosts_file_path:
-                        res['data'] = f'{playbook_command} {abs_file}  -v -e {data["vers"]}'
-                    elif not data['vers']:
-                        res['data'] = f'{playbook_command} {abs_file} -v -i {hosts_file_path}'
-                    else:
-                        res['data'] = f'{playbook_command} {abs_file} -v -i {hosts_file_path} -e {data["vers"]}'
-                else:
-                    res['status'] = False
-                    res['data'] = '所选项目或剧本文件不存在，请检查后重试。'
-            elif type == 'script':
-                pass
+                    hosts_file_path = os.path.join(get_value('ansible', 'ansible_host_path'), data['host_file'])
             else:
-                res['status'] = False
-                res['data'] = '所选项目或剧本文件不存在，请检查后重试。'
-            res['script_file'] = abs_file
-            return res
+                hosts_file_path = data['host_file']
+            if data['parameter_id']:
+                par_obj = AnsibleParameter.objects.filter(id=data['parameter_id']).first()
+            else:
+                par_obj = None
+            if not hosts_file_path and not par_obj:
+                return f'{playbook_command} {abs_file} -v  '
+            elif not hosts_file_path:
+                return f'{playbook_command} {abs_file}  -v -e {par_obj.param}'
+            elif not par_obj:
+                return f'{playbook_command} {abs_file} -v -i {hosts_file_path}'
+            else:
+                return f'{playbook_command} {abs_file} -v -i {hosts_file_path} -e {par_obj.param}'
         except Exception as e:
             res['status'] = False
             res['data'] = str(e)
@@ -122,24 +125,28 @@ class Base(NewModelViewSet):
             # if source:
             return os.path.join(settings.TASK_SCRIPT_DIR, project, file)
 
-    def record_log(self, request, task_name, abs_file, result_id, host_list, task_type):
-        username = self.get_user(request)
+    def record_log(self, request, task_name, abs_file, result_id, task_host_list, task_type, run_type):
         if 'HTTP_X_FORWARDED_FOR' in request.META:
             ip = request.META['HTTP_X_FORWARDED_FOR']
         else:
             ip = request.META['REMOTE_ADDR']
+        run_type_id = 0 if run_type == 'ansible' else 1
         result_status = AsyncResult(id=result_id, app=app)
         log_dic = {
-            'src_user': username,
+            'src_user': self.get_user(request),
             'src_ip': ip,
             'task_name': task_name,
             'task_id': result_id,
             'script_file': abs_file,
             'task_status': result_status,
             'task_type': task_type,
-            'task_host': host_list
+            'task_host': task_host_list,
+            'run_type': run_type_id
         }
-        TaskHistory.objects.create(**log_dic)
+        print(log_dic)
+        history_obj = TaskHistory.objects.create(**log_dic)
+        history_obj.save()
+        print('ok')
 
     def script_save(self, data):
         res_dict = {'status': True, 'data': ''}
