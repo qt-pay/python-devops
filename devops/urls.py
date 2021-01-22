@@ -24,7 +24,7 @@ urlpatterns = [
     path('api/cmdb-api/', include('apps.api.urls')),
     path('api/ansible/', include('apps.ansible.urls')),
     path('api/settings/', include('apps.system.urls')),
-    path('api/task/', include('apps.task.urls')),
+    # path('api/task/', include('apps.task.urls')),
     path('api/tasks/', include('apps.task_platform.urls')),
     path('docs/', include_docs_urls(title='自动化运维平台!'))
 ]

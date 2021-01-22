@@ -1,14 +1,15 @@
-from django.conf import settings
-from rest_framework.decorators import action
-
-from .BaseViewSet import Base
-from ..models import AnsiblePlaybook, AnsibleProject, TaskRecycle
-from ..serializers import AnsiblePlaybookSerializer
-from utils.rest_framework.base_response import new_response
 import os
 import shutil
 import pathlib
 import datetime
+
+from .BaseViewSet import Base
+from ..models import AnsiblePlaybook, AnsibleProject, TaskRecycle
+from ..serializers import AnsiblePlaybookSerializer
+from base.response import json_ok_response, json_error_response
+
+from django.conf import settings
+from rest_framework.decorators import action
 
 
 class AnsiblePlaybookViewSet(Base):
@@ -23,16 +24,16 @@ class AnsiblePlaybookViewSet(Base):
             data = request.data
             save_file_info = self.playbook_save(data)
             if not save_file_info['status']:
-                return new_response(code=10200, data='数据保存失败', message=save_file_info['data'])
+                return json_error_response(message=save_file_info['data'])
             data['file_name'] = save_file_info['data']
             data['src_user'] = self.get_user(request)
             serializer = self.get_serializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return new_response(data=serializer.data)
+            return json_ok_response(data=serializer.data)
 
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))
 
     def update(self, request, *args, **kwargs):
 
@@ -45,7 +46,7 @@ class AnsiblePlaybookViewSet(Base):
             old_project_path = instance.project.path
             new_project_path = project_obj.path
             if os.path.exists(os.path.join(settings.TASK_PLAYBOOK_DIR, new_project_path, instance.file_name)):
-                return new_response(code=10200, data='脚本已经存在', message='新项目中已经存在同名脚本，请检查后重试。')
+                return json_error_response(message='新项目中已经存在同名脚本，请检查后重试。')
 
             if instance.file_name.endswith('.yaml'):
                 shutil.move(os.path.join(settings.TASK_PLAYBOOK_DIR, old_project_path, instance.file_name),
@@ -60,9 +61,9 @@ class AnsiblePlaybookViewSet(Base):
             serializer.save()
             if getattr(instance, '_prefetched_objects_cache', None):
                 instance._prefetched_objects_cache = {}
-            return new_response(data=serializer.data)
+            return json_ok_response(data=serializer.data)
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e), )
 
     @action(methods=['get'], detail=True)
     def playbook_detail(self, request, pk):
@@ -76,11 +77,12 @@ class AnsiblePlaybookViewSet(Base):
                 file_obj = pathlib.Path(abs_file)
                 file_content = file_obj.read_text(encoding='utf-8')
 
-                return new_response(data={'id': instance.id, 'file_name': instance.file_name, 'content': file_content})
+                return json_ok_response(
+                    data={'id': instance.id, 'file_name': instance.file_name, 'content': file_content})
             else:
-                return new_response(code=10200, data='读取文件错误', message='读取的文件不存在。')
+                return json_error_response(message='读取的文件不存在。')
         except Exception as e:
-            return new_response(code='10200', data='获取文件详情出错', message=str(e))
+            return json_error_response(message=str(e))
 
     @action(methods=['put'], detail=True)
     def playbook_alter(self, request, pk):
@@ -97,14 +99,14 @@ class AnsiblePlaybookViewSet(Base):
                 new_abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, instance.project.path, ) + instance.file_name
                 os.remove(new_abs_file)
             else:
-                return new_response(code=10200, data='文件修改失败', message='文件名不合法，暂只支持 .yaml 结尾文件。')
+                return json_error_response(message='文件名不合法，暂只支持 .yaml 结尾文件。')
             file_obj = pathlib.Path(new_abs_file)
             file_obj.write_text(content, encoding='utf-8')
             instance.src_user = self.get_user(request)
             instance.save()
-            return new_response(data='文件更新成功')
+            return json_ok_response(data='文件更新成功')
         except Exception as e:
-            return new_response(code='10200', data='文件修改失败', message=str(e))
+            return json_error_response(message=str(e))
 
     # 删除
     def destroy(self, request, *args, **kwargs):
@@ -129,6 +131,6 @@ class AnsiblePlaybookViewSet(Base):
                 old_abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, project_path, instance.file_name.split('/')[1])
             shutil.move(old_abs_file, abs_path)
             instance.delete()
-            return new_response()
+            return json_ok_response()
         except Exception as e:
-            return new_response(code=10200, data='error', message=f'ERROR: {str(e)}')
+            return json_error_response(message=f'ERROR: {str(e)}')

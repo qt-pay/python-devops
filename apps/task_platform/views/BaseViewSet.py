@@ -1,18 +1,21 @@
-from django.conf import settings
-from celery.result import AsyncResult
-from my_celery.run import app
-from ..models import TaskHistory, ScriptProject, AnsibleProject, AnsibleParameter
-from utils.rest_framework.base_view import NewModelViewSet
-from utils.config.get_config_value import get_value
-from utils.script.random_str import random_str
-from apps.rbac.auth.jwt_auth import analysis_token
 import os
 import tarfile
 import zipfile
 import shutil
 
+from ..models import TaskHistory, ScriptProject, AnsibleProject, AnsibleParameter
 
-class Base(NewModelViewSet):
+from base.views import BaseModelViewSet
+from common.get_config_value import get_value
+from common.random_str import random_str
+from apps.rbac.auth.jwt_auth import analysis_token
+from my_celery.run import app
+
+from django.conf import settings
+from celery.result import AsyncResult
+
+
+class Base(BaseModelViewSet):
 
     def async_ssh_cmd(self, abs_file, data):
         list = []

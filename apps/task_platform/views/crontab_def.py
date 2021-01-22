@@ -1,4 +1,5 @@
 from ..models import TaskHistory
+
 from my_celery.script_task.tasks import script_task
 from my_celery.paramiko_task.tasks import paramiko_ssh_task
 

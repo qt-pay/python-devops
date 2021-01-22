@@ -1,15 +1,16 @@
-from utils.rest_framework.base_response import new_response
-from utils.rest_framework.base_view import NewModelViewSet
+from .base_view import Base
+from base.response import json_ok_response, json_error_response
 from ..serializers import NetworkDeviceSerializer
 from ..models import NetworkDevice, Asset
 
 
-class NetworkDeviceViewSet(NewModelViewSet):
+class NetworkDeviceViewSet(Base):
     queryset = NetworkDevice.objects.all().order_by('id')
     serializer_class = NetworkDeviceSerializer
     ordering_fields = ('id', 'hostname',)
     search_fields = ('hostname', 'manage_ip')
-    filter_fields = ('id','asset_obj' )
+    filter_fields = ('id', 'asset_obj')
+
     def create(self, request, *args, **kwargs):
         try:
             hostname = request.data['hostname']
@@ -22,14 +23,15 @@ class NetworkDeviceViewSet(NewModelViewSet):
                 serializer = self.get_serializer(data=request.data)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
-                return new_response(data=serializer.data)
+                return json_ok_response(data=serializer.data)
             else:
-                return new_response(code=10200, data='error', message='hostname/type_id为必传参数')
+                return json_error_response(message='hostname/type_id为必传参数')
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))
+
     def update(self, request, *args, **kwargs):
         try:
-            row_map = {'hostname': '名称', 'manage_ip': '管理IP',  'vlan_ip': 'Vlan_IP',  'intranet_ip': '内网IP',
+            row_map = {'hostname': '名称', 'manage_ip': '管理IP', 'vlan_ip': 'Vlan_IP', 'intranet_ip': '内网IP',
                        'sn': 'DN号', 'manufacturer': '制造商', 'model': '型号', 'port_num': '端口数', 'device_detail': '配置详情'}
             record_list = []
             partial = kwargs.pop('partial', False)
@@ -46,6 +48,6 @@ class NetworkDeviceViewSet(NewModelViewSet):
                 print(record_list)
                 content = ';  '.join(record_list)
                 self.asset_record(request, '资产变更', content, instance.asset_obj.id)
-            return new_response(data=instance.hostname)
+            return json_ok_response(data=instance.hostname)
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))

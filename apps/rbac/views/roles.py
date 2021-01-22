@@ -1,11 +1,11 @@
-from utils.rest_framework.base_response import new_response
-from utils.rest_framework.base_view import NewModelViewSet
+from base.views import BaseModelViewSet
+from base.response import json_ok_response, json_error_response
 from ..serializers import RolesSerializer
 from ..models import Roles
 
 
-class RolesViewSet(NewModelViewSet):
+class RolesViewSet(BaseModelViewSet):
     queryset = Roles.objects.all()
     serializer_class = RolesSerializer
     ordering_fields = ('id', 'title',)
-    search_fields = ('title', )
+    search_fields = ('title',)

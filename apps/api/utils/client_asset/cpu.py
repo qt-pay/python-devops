@@ -19,7 +19,7 @@ class Cpu(Base):
     def parse(self, content):
         if not content['status']:
             '''出错记录日志不做处理'''
-            self.error_logging(server_obj=self.server_obj, content=content['data'], title= self.error_message)
+            self.error_logging(server_obj=self.server_obj, content=content['data'], title=self.error_message)
             return None
         print(content)
         self.__clent_data(content)

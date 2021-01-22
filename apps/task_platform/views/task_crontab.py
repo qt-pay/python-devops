@@ -1,13 +1,15 @@
 # 定时任务
-from .BaseViewSet import Base
-from rest_framework.views import APIView
-from utils.rest_framework.base_response import new_response
-from utils.config.get_config_value import get_value
-from utils.script.random_str import random_str
-from .crontab_def import add_ansible_crontab, add_ssh_crontab
-from ..models import TaskCrontab, ScriptFile, AnsiblePlaybook, TaskHistory
-from ..serializers import TaskCrontabSerializer
+import os
 import uuid
+
+from .BaseViewSet import Base
+from .crontab_def import add_ansible_crontab, add_ssh_crontab
+from ..models import TaskCrontab, ScriptFile, AnsiblePlaybook
+from ..serializers import TaskCrontabSerializer
+from base.response import json_ok_response, json_error_response
+
+from django.conf import settings
+
 # 实例化
 from apscheduler.schedulers.background import BackgroundScheduler
 from django_apscheduler.jobstores import DjangoJobStore, register_events
@@ -15,9 +17,6 @@ from django_apscheduler.jobstores import DjangoJobStore, register_events
 scheduler = BackgroundScheduler()
 scheduler.add_jobstore(DjangoJobStore())  # 指定存储
 scheduler.start()
-import os
-from django.conf import settings
-from .BaseViewSet import Base
 
 
 class TaskCrontabViewSet(Base):
@@ -40,7 +39,7 @@ class TaskCrontabViewSet(Base):
                 else:
                     abs_file = f'{os.path.join(settings.TASK_SCRIPT_DIR, script_obj.project.path)}{script_obj.file_name}'
             if not os.path.isfile(abs_file):
-                return new_response(code=10200, data='文件找不到', message='所选文件找不到请检查后重试。')
+                return json_error_response(message='所选文件找不到请检查后重试。')
 
             if data['run_type'] == 'ansible':
                 cmd = self.ansible_cmd(abs_file, data=data)
@@ -96,9 +95,9 @@ class TaskCrontabViewSet(Base):
                 )
             # 注册任务
             register_events(scheduler)
-            return new_response()
+            return json_ok_response()
         except Exception as e:
-            return new_response(code=10200, message=str(e))
+            return json_error_response(message=str(e))
 
     def update(self, request, *args, **kwargs):
         try:
@@ -108,20 +107,20 @@ class TaskCrontabViewSet(Base):
                 instance.task_status = True
                 scheduler.resume_job(instance.task_id)
                 instance.save()
-                return new_response(data=f'{instance.name} 任务开启成功')
+                return json_ok_response(data=f'{instance.name} 任务开启成功')
             else:
                 scheduler.pause_job(instance.task_id)
                 instance.task_status = False
                 instance.save()
-                return new_response(data=f'{instance.name} 任务停止成功')
+                return json_ok_response(data=f'{instance.name} 任务停止成功')
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e), )
 
     def destroy(self, request, *args, **kwargs):
         try:
             instance = self.get_object()
             scheduler.remove_job(instance.task_id)
             instance.delete()
-            return new_response()
+            return json_ok_response()
         except Exception as e:
-            return new_response(code=10200, data='eroor', message=f'ERROR: {str(e)}')
+            return json_error_response(message=f'ERROR: {str(e)}')

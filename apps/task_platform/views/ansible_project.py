@@ -1,9 +1,11 @@
-from django.conf import settings
+import os
+
 from .BaseViewSet import Base
 from ..models import AnsibleProject
 from ..serializers import AnsibleProjectSerializer
-from utils.rest_framework.base_response import new_response
-import os
+from base.response import json_ok_response, json_error_response
+
+from django.conf import settings
 
 
 class AnsibleProjectViewSet(Base):
@@ -20,7 +22,7 @@ class AnsibleProjectViewSet(Base):
             abs_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project_path)
 
             if os.path.exists(abs_path):
-                return new_response(code=10200, data='文件夹已经存在', message='项目文件夹已经存在，请检查后重测。')
+                return json_error_response(message='项目文件夹已经存在，请检查后重测。')
 
             os.mkdir(abs_path)
             data['src_user'] = self.get_user(request)
@@ -28,9 +30,9 @@ class AnsibleProjectViewSet(Base):
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
-            return new_response(data=serializer.data)
+            return json_ok_response(data=serializer.data)
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))
 
     def update(self, request, *args, **kwargs):
         try:
@@ -41,7 +43,7 @@ class AnsibleProjectViewSet(Base):
             new_dir_path = data['path']
             abs_path = os.path.join(settings.TASK_PLAYBOOK_DIR, new_dir_path)
             if os.path.exists(abs_path):
-                return new_response(code=10200, message='项目路径已经存在请更换路径。', data='文件夹已经存在')
+                return json_error_response(message='项目路径已经存在请更换路径。', )
             data['src_user'] = self.get_user(request)
             serializer = self.get_serializer(instance, data=data, partial=partial)
             serializer.is_valid(raise_exception=True)
@@ -50,9 +52,9 @@ class AnsibleProjectViewSet(Base):
                 instance._prefetched_objects_cache = {}
             os.rename(os.path.join(settings.TASK_SCRIPT_DIR, old_dir_path),
                       os.path.join(settings.TASK_SCRIPT_DIR, new_dir_path))
-            return new_response(data=serializer.data)
+            return json_ok_response(data=serializer.data)
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -62,7 +64,7 @@ class AnsibleProjectViewSet(Base):
                 os.rmdir(os.path.join(settings.TASK_PLAYBOOK_DIR, project_path))
                 instance.delete()
             else:
-                return new_response(code=10200, data='删除出错', message='目标文件夹不为空，请先清理其数据！')
-            return new_response()
+                return json_error_response(message='目标文件夹不为空，请先清理其数据！')
+            return json_ok_response()
         except Exception as e:
-            return new_response(code=10200, data='error', message=f'ERROR: {str(e)}')
+            return json_error_response(message=f'ERROR: {str(e)}')

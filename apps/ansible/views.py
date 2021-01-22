@@ -1,58 +1,57 @@
-from django.shortcuts import render
+import os
 
-# Create your views here.
-
-from rest_framework.decorators import action
-from utils.rest_framework.base_response import new_response
 from .serializers import *
 from .models import *
-from utils.config.get_config_value import get_ansible_host_list, get_value
-from utils.rest_framework.base_view import NewModelViewSet
+from base.views import BaseModelViewSet, BaseApiView
+from base.response import json_ok_response, json_error_response
+
+from common.get_config_value import get_ansible_host_list, get_value
+from common.get_config_value import get_value
+from common.subprocess_cmd import subexec_cmd
+
+from rest_framework.decorators import action
 from rest_framework.views import APIView
-from utils.config.get_config_value import get_value
-import os
-# from utils.script.ssh_paramiko import get_connection
-from utils.script.subprocess_cmd import subexec_cmd
-class ProjectViewSet(NewModelViewSet):
+
+
+class ProjectViewSet(BaseModelViewSet):
     queryset = Project.objects.all().order_by('id')
     serializer_class = ProjectSerializer
     ordering_fields = ('id', 'name',)
     search_fields = ('name',)
-    filter_fields = ('id', 'online_status', )
-
+    filter_fields = ('id', 'online_status',)
 
     @action(methods=['get'], detail=False)
     def host_list(self, request):
         host_list = get_ansible_host_list(get_value('ansible_host_path'))
         print(host_list)
-        return new_response(data=host_list)
-
+        return json_ok_response(data=host_list)
 
 
 #
-class JobViewSet(NewModelViewSet):
+class JobViewSet(BaseModelViewSet):
     queryset = Job.objects.all().order_by('id')
     serializer_class = JobSerializer
     ordering_fields = ('id', 'name',)
     search_fields = ('name',)
-    filter_fields = ('id', 'project', 'online_status', )
+    filter_fields = ('id', 'project', 'online_status',)
 
 
-
-class ExtravarsViewSet(NewModelViewSet):
+class ExtravarsViewSet(BaseModelViewSet):
     queryset = Extravars.objects.all().order_by('id')
     serializer_class = ExtravarsSerializer
     ordering_fields = ('id', 'name',)
     search_fields = ('name',)
-    filter_fields = ('id', 'job', 'online_status', )
+    filter_fields = ('id', 'job', 'online_status',)
 
-class HistoryViewSet(NewModelViewSet):
+
+class HistoryViewSet(BaseModelViewSet):
     queryset = History.objects.all().order_by('-id')
     serializer_class = HistorySerializer
     ordering_fields = ('id', 'task_name',)
     search_fields = ('task_name',)
 
-class Task_SubmitView(APIView):
+
+class Task_SubmitView(BaseApiView):
     '''
     host: Array(2)
         0: "127.0.0.1"
@@ -72,7 +71,7 @@ class Task_SubmitView(APIView):
         cmd = self.__cmd(data)
         res = subexec_cmd(cmd)
         # res = get_connection('127.0.0.1', 'root', 'devops', cmd,22)
-        return new_response(data=res['data'])
+        return json_ok_response(data=res['data'])
 
     def __cmd(self, data_dic):
         project_base_path = get_value('project_base_path')

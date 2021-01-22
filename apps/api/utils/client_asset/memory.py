@@ -1,9 +1,11 @@
 from apps.cmdb import models
 from .Base import Base
 
+
 class Memory(Base):
     def __init__(self, server_obj):
-        self.row_map = {'slot': '插槽位', 'manufacturer': '制造商', 'model': '型号', 'capacity': '容量', 'sn': '内存sn', 'speed': '速率'}
+        self.row_map = {'slot': '插槽位', 'manufacturer': '制造商', 'model': '型号', 'capacity': '容量', 'sn': '内存sn',
+                        'speed': '速率'}
         self.server_obj = server_obj
         self.type = '内存'
         self.error_message = f'[{self.server_obj.hostname}]-<{self.type}>收集信息出错'
@@ -20,9 +22,9 @@ class Memory(Base):
         print('刚进来')
         if not content['status']:
             '''出错记录日志不做处理'''
-            self.error_logging(server_obj=self.server_obj, content=content['data'], title= self.error_message)
+            self.error_logging(server_obj=self.server_obj, content=content['data'], title=self.error_message)
             return None
-        self.__clent_data(content )
+        self.__clent_data(content)
 
     def __clent_data(self, content):
         print('处理数据')
@@ -45,13 +47,13 @@ class Memory(Base):
         if create_slot_list:
             self.__create_data(create_slot_list, new_memory_dict)
         if update_slot_list:
-            self.__update_data(update_slot_list,new_memory_dict)
+            self.__update_data(update_slot_list, new_memory_dict)
         if delete_slot_list:
             self.__delete_data(delete_slot_list)
 
     def __create_data(self, create_slot_list, new_memory_dict):
         print(new_memory_dict)
-        record_list = [ ]
+        record_list = []
         for slot in create_slot_list:
             # 新数据
             memory_dict = new_memory_dict[slot]
@@ -63,8 +65,9 @@ class Memory(Base):
         if record_list:
             content = ';  '.join(record_list)
             self.access_logging(title=self.create_record, server_obj=self.server_obj, content=content)
-    def __update_data(self, update_slot_list,new_memory_dict):
-        record_list = [ ]
+
+    def __update_data(self, update_slot_list, new_memory_dict):
+        record_list = []
         for slot in update_slot_list:
             # 新数据
             new_dict_row = new_memory_dict[slot]
@@ -78,12 +81,14 @@ class Memory(Base):
         # 记录日志
         if record_list:
             content = ';  '.join(record_list)
-            self.access_logging(title=self.update_record , server_obj=self.server_obj, content=content)
-    def __delete_data(self ,delete_slot_list ):
+            self.access_logging(title=self.update_record, server_obj=self.server_obj, content=content)
+
+    def __delete_data(self, delete_slot_list):
         record_list = [f'{self.delete_record}', ]
         delete_memory_obj = models.Memory.objects.filter(server_obj=self.server_obj, slot__in=delete_slot_list)
         for obj in delete_memory_obj:
-            record_list.append(f'槽位 << {obj.slot} >>: 容量:<< {obj.capacity} >>, sn号: << {obj.sn} >>, 制造商: << {obj.manufacturer} >>, 型号: << {obj.model} >>.')
+            record_list.append(
+                f'槽位 << {obj.slot} >>: 容量:<< {obj.capacity} >>, sn号: << {obj.sn} >>, 制造商: << {obj.manufacturer} >>, 型号: << {obj.model} >>.')
         delete_memory_obj.delete()
         if record_list:
             content = ';  '.join(record_list)

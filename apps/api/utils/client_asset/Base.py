@@ -2,14 +2,17 @@ from apps.cmdb import models
 
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+
+
 # import logging
 class Base():
     def error_logging(self, server_obj, content, title):
         print(server_obj, content, title)
         models.AssetErrorLog.objects.create(asset_obj=server_obj.asset_obj,
-                                       content=content,
-                                       title=title)
-    def access_logging(self,title, server_obj,content ):
+                                            content=content,
+                                            title=title)
+
+    def access_logging(self, title, server_obj, content):
         models.AssetRecord.objects.create(title=title, asset_obj=server_obj.asset_obj, content=content)
 
     def __ping_func(self, ip):

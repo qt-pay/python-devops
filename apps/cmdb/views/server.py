@@ -1,10 +1,10 @@
-from utils.rest_framework.base_response import new_response
-from utils.rest_framework.base_view import NewModelViewSet
+from .base_view import Base
+from base.response import json_ok_response, json_error_response
 from ..serializers import ServerSerializer
 from ..models import Server, Asset, AssetRecord
-import datetime
 
-class ServerViewSet(NewModelViewSet):
+
+class ServerViewSet(Base):
     queryset = Server.objects.all().order_by('id')
     serializer_class = ServerSerializer
     ordering_fields = ('id', 'title',)
@@ -25,21 +25,20 @@ class ServerViewSet(NewModelViewSet):
                 serializer = self.get_serializer(data=request.data)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
-                return new_response(data=serializer.data)
+                return json_ok_response(data=serializer.data)
             else:
-                return new_response(code=10200, data='error', message='hostname/type_id为必传参数')
+                return json_error_response(message='hostname/type_id为必传参数')
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
-
-
+            return json_error_response(message=str(e))
 
     def update(self, request, *args, **kwargs):
 
         try:
-            row_map = {'hostname': '主机名', 'manage_ip': '管理IP',  'os_platform': '操作系统',  'os_version': '系统版本',
-                       'sn': '主板SN号', 'manufacturer': '制造商', 'model': '型号', 'cpu_count': 'CPU逻辑核数', 'cpu_physical_count': 'CPU物理核数',
-            'cpu_model': 'cpu型号', 'latest_date': '更新时间', 'create_at': '创建时间', 'asset_obj': '关联资产'}
-            record_list =  []
+            row_map = {'hostname': '主机名', 'manage_ip': '管理IP', 'os_platform': '操作系统', 'os_version': '系统版本',
+                       'sn': '主板SN号', 'manufacturer': '制造商', 'model': '型号', 'cpu_count': 'CPU逻辑核数',
+                       'cpu_physical_count': 'CPU物理核数',
+                       'cpu_model': 'cpu型号', 'latest_date': '更新时间', 'create_at': '创建时间', 'asset_obj': '关联资产'}
+            record_list = []
             partial = kwargs.pop('partial', False)
             new_data = request.data
             instance = self.get_object()
@@ -57,6 +56,6 @@ class ServerViewSet(NewModelViewSet):
             if len(record_list) != 0:
                 content = ';  '.join(record_list)
                 self.asset_record(request, '服务器基本信息变更', content, instance.asset_obj.id)
-            return new_response(data=instance.hostname)
+            return json_ok_response(data=instance.hostname)
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))

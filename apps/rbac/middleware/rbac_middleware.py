@@ -2,7 +2,7 @@ from ..auth.jwt_auth import analysis_token
 import re
 from django.utils.deprecation import MiddlewareMixin
 from django.conf import settings
-from utils.rest_framework.base_response import new_response
+from utils.rest_framework.response import new_response
 from django.http import JsonResponse
 from .get_url import check_current_url
 # from apps.rbac.auth.auth import

@@ -1,6 +1,7 @@
 from apps.cmdb import models
 from .Base import Base
 
+
 class Network(Base):
     def __init__(self, server_obj):
         self.row_map = {'title': '名称', 'hwaddr': '网卡Mac地址', 'netmask': '子网掩码', 'ipaddress': '槽位', 'up': '网卡好状态'}
@@ -68,7 +69,7 @@ class Network(Base):
             self.access_logging(title=self.create_record, server_obj=self.server_obj, content=content)
 
     def __update_data(self, update_title_list, new_network_dict):
-        record_list = [ ]
+        record_list = []
         ip_list = []
         for title in update_title_list:
             new_dict_row = new_network_dict[title]
@@ -97,11 +98,12 @@ class Network(Base):
         return None
 
     def __delete_data(self, delete_title_list):
-        record_list = [ ]
+        record_list = []
         ip_list = []
         delete_network_obj = models.Network.objects.filter(server_obj=self.server_obj, title__in=delete_title_list)
         for obj in delete_network_obj:
-            record_list.append(f': 名称: << {obj.title} >>, IP地址: << {obj.ipaddress} >>, Mac地址: << {obj.hwaddr} >>, 状态: << {obj.up} >>.')
+            record_list.append(
+                f': 名称: << {obj.title} >>, IP地址: << {obj.ipaddress} >>, Mac地址: << {obj.hwaddr} >>, 状态: << {obj.up} >>.')
             ip_list.append(obj.ipaddress)
         delete_network_obj.delete()
         # 配置管理IP
@@ -122,8 +124,11 @@ class Network(Base):
             self.server_obj.manage_ip = new_manage_ip
             self.server_obj.save()
             if old_manage_ip:
-                self.access_logging(title=f"<<管理IP变更>>", server_obj=self.server_obj, content=f'管理IP由: << {old_manage_ip} >>, 变更为: << {new_manage_ip} >>.')
+                self.access_logging(title=f"<<管理IP变更>>", server_obj=self.server_obj,
+                                    content=f'管理IP由: << {old_manage_ip} >>, 变更为: << {new_manage_ip} >>.')
             else:
-                self.access_logging(title=f"<<新增管理IP>>",server_obj=self.server_obj,content=f'管理IP设置为: << {new_manage_ip} >>')
+                self.access_logging(title=f"<<新增管理IP>>", server_obj=self.server_obj,
+                                    content=f'管理IP设置为: << {new_manage_ip} >>')
         else:
-            self.error_logging(server_obj=self.server_obj, content=f'[管理IP变更===>:] 管理IP设置失败没有可用IP,IP表为: [{ipaddr_list}]', title=self.error_message)
+            self.error_logging(server_obj=self.server_obj,
+                               content=f'[管理IP变更===>:] 管理IP设置失败没有可用IP,IP表为: [{ipaddr_list}]', title=self.error_message)

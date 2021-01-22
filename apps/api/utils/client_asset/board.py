@@ -1,5 +1,6 @@
 from .Base import Base
 
+
 class Board(Base):
     def __init__(self, server_obj):
         self.row_map = {'sn': 'sn号', 'manufacturer': '制造商', 'model': '型号', }
@@ -17,7 +18,7 @@ class Board(Base):
     def parse(self, content):
         if not content['status']:
             '''出错记录日志不做处理'''
-            self.error_logging(server_obj=self.server_obj, content=content['data'], title= self.error_message)
+            self.error_logging(server_obj=self.server_obj, content=content['data'], title=self.error_message)
             return None
         self.__clent_data(content)
 
@@ -33,4 +34,3 @@ class Board(Base):
             self.server_obj.save()
             content = ';  '.join(record_list)
             self.access_logging(title=self.update_record, server_obj=self.server_obj, content=content)
-

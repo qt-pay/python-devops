@@ -172,7 +172,7 @@ TASK_PLAYBOOK_DIR = os.path.join(TASK_BASE_DIR, 'playbook')
 REST_FRAMEWORK = {
     # 'DEFAULT_AUTHENTICATION_CLASSES': ('apps.rbac.auth.auth.JwtQueryParamsAuthentication', ),
     'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.AutoSchema',
-    'DEFAULT_PAGINATION_CLASS': 'utils.rest_framework.base_pagination.NewPagination',
+    'DEFAULT_PAGINATION_CLASS': 'base.base_pagination.NewPagination',
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',
                                 'rest_framework.filters.SearchFilter',
                                 'rest_framework.filters.OrderingFilter',),

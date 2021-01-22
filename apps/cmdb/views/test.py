@@ -1,16 +1,15 @@
-from utils.rest_framework.base_response import new_response
-from utils.rest_framework.base_view import NewModelViewSet
+from .base_view import Base
+from base.response import json_ok_response, json_error_response
 from ..serializers import AssetSerializer
 from ..models import Asset, Server, NetworkDevice
 from django.forms.models import model_to_dict
 
 
-class TestViewSet(NewModelViewSet):
+class TestViewSet(Base):
     queryset = Asset.objects.all().order_by('id')
     serializer_class = AssetSerializer
 
-
-    def list(self, request):
+    def list(self, request, *args, **kwargs):
         try:
             dic = {}
             queryset = Asset.objects.all()
@@ -31,6 +30,6 @@ class TestViewSet(NewModelViewSet):
                     new_idc['manage_ip'] = network.manage_ip
                     new_idc['hostname'] = network.hostname
                     dic.update(new_idc)
-            return new_response(data=dic)
+            return json_ok_response(data=dic)
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e), )

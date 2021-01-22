@@ -1,13 +1,7 @@
-from django.conf import settings
-from rest_framework.decorators import action
 from .BaseViewSet import Base
-from ..models import AnsibleParameter, ScriptProject, TaskRecycle
+from ..models import AnsibleParameter
 from ..serializers import AnsibleParameterSerializer
-from utils.rest_framework.base_response import new_response
-import os
-import pathlib
-import datetime
-import shutil
+from base.response import json_ok_response, json_error_response
 
 
 class AnsibleParameterViewSet(Base):
@@ -24,9 +18,9 @@ class AnsibleParameterViewSet(Base):
             serializer = self.get_serializer(data=data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return new_response(data=serializer.data)
+            return json_ok_response(data=serializer.data)
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))
 
     def update(self, request, *args, **kwargs):
         try:
@@ -39,6 +33,6 @@ class AnsibleParameterViewSet(Base):
             serializer.save()
             if getattr(instance, '_prefetched_objects_cache', None):
                 instance._prefetched_objects_cache = {}
-            return new_response(data=serializer.data)
+            return json_ok_response(data=serializer.data)
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))

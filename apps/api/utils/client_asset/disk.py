@@ -12,7 +12,6 @@ class Disk(Base):
         self.delete_record = f'<{self.type}移除记录>'
         self.create_record = f'<{self.type}新增记录>'
 
-
     @classmethod
     def initial(cls, server_obj):
         return cls(server_obj)
@@ -20,9 +19,9 @@ class Disk(Base):
     def parse(self, content):
         if not content['status']:
             '''出错记录日志不做处理'''
-            self.error_logging(server_obj=self.server_obj, content=content['data'], title= self.error_message)
+            self.error_logging(server_obj=self.server_obj, content=content['data'], title=self.error_message)
             return None
-        self.__clent_data(content )
+        self.__clent_data(content)
 
     def __clent_data(self, content):
         new_disk_dict = content['data']
@@ -40,12 +39,12 @@ class Disk(Base):
         if create_slot_list:
             self.__create_data(create_slot_list, new_disk_dict)
         if update_slot_list:
-            self.__update_data(update_slot_list,new_disk_dict)
+            self.__update_data(update_slot_list, new_disk_dict)
         if delete_slot_list:
             self.__delete_data(delete_slot_list)
 
     def __create_data(self, create_slot_list, new_disk_dict):
-        record_list = [ ]
+        record_list = []
         for slot in create_slot_list:
             # 新数据
             disk_dict = new_disk_dict[slot]
@@ -57,8 +56,9 @@ class Disk(Base):
         if record_list:
             content = ';  '.join(record_list)
             self.access_logging(title=self.create_record, server_obj=self.server_obj, content=content)
-    def __update_data(self, update_slot_list,new_disk_dict):
-        record_list = [ ]
+
+    def __update_data(self, update_slot_list, new_disk_dict):
+        record_list = []
         for slot in update_slot_list:
             # 新数据
             new_dict_row = new_disk_dict[slot]
@@ -73,11 +73,13 @@ class Disk(Base):
         if record_list:
             content = ';  '.join(record_list)
             self.access_logging(server_obj=self.server_obj, content=content)
-    def __delete_data(self ,delete_slot_list ):
-        record_list = [ ]
+
+    def __delete_data(self, delete_slot_list):
+        record_list = []
         delete_disk_obj = models.Disk.objects.filter(server_obj=self.server_obj, slot__in=delete_slot_list)
         for obj in delete_disk_obj:
-            record_list.append(f'槽位: << {obj.slot} >>, 容量: << {obj.capacity} >> , 类型:<< {obj.pd_type} >> , 型号:<< {obj.model} >>')
+            record_list.append(
+                f'槽位: << {obj.slot} >>, 容量: << {obj.capacity} >> , 类型:<< {obj.pd_type} >> , 型号:<< {obj.model} >>')
         delete_disk_obj.delete()
         if record_list:
             content = ';  '.join(record_list)

@@ -1,11 +1,14 @@
-from utils.rest_framework.base_view import NewModelViewSet
-from utils.rest_framework.base_response import new_response
-from apps.cmdb import models
-import importlib
 import os
-from utils.config.get_config_value import config, config_path
+import importlib
 
-class EditConf(NewModelViewSet):
+from apps.cmdb import models
+from base.views import BaseModelViewSet
+from base.response import json_ok_response, json_error_response
+
+from common.get_config_value import config, config_path
+
+
+class EditConf(BaseModelViewSet):
     def list(self, request):
         try:
             cfg = config()
@@ -15,9 +18,9 @@ class EditConf(NewModelViewSet):
                 for item in cfg.items(section):
                     item_dic[item[0]] = item[1]
                 conf_dic[section] = item_dic
-            return new_response(data=conf_dic)
+            return json_ok_response(data=conf_dic)
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))
 
     def update(self, request, *args, **kwargs):
         try:
@@ -28,11 +31,11 @@ class EditConf(NewModelViewSet):
             exists_list.append(data['ansible']['project_base_path'])
             for path in exists_list:
                 if not os.path.exists(path):
-                    return new_response(code=10200, data='目录或文件不存在', message=f'文件或目录不存在请核对后再试: {path}')
+                    return json_error_response(message=f'文件或目录不存在请核对后再试: {path}')
             for iname in data.keys():
                 for k, v in data[iname].items():
                     cfg.set(iname, k, v)
             cfg.write(open(config_path, "w", encoding='utf-8'))
-            return new_response()
+            return json_ok_response()
         except Exception as e:
-            return new_response(code=10200, message=str(e), data='error')
+            return json_error_response(message=str(e))
