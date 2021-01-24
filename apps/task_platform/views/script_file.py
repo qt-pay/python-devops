@@ -1,12 +1,10 @@
-import os
-import pathlib
 import datetime
-import shutil
 
 from .BaseViewSet import Base
 from ..models import ScriptFile, ScriptProject, TaskRecycle
 from ..serializers import ScriptFileSerializer
 from base.response import json_ok_response, json_error_response
+from common.file import File
 
 from django.conf import settings
 from rest_framework.decorators import action
@@ -44,10 +42,10 @@ class ScriptFileViewSet(Base):
             instance = self.get_object()
             old_project_path = instance.project.path
             new_project_path = project_obj.path
-            if os.path.exists(os.path.join(settings.TASK_SCRIPT_DIR, new_project_path, instance.file_name)):
+            if File.if_dir_exists(File.get_join_path(settings.TASK_SCRIPT_DIR, new_project_path, instance.file_name)):
                 return json_error_response(message='新项目中已经存在同名脚本，请检查后重试。')
-            shutil.move(os.path.join(settings.TASK_SCRIPT_DIR, old_project_path, instance.file_name),
-                        os.path.join(settings.TASK_SCRIPT_DIR, new_project_path, instance.file_name))
+            File.move_file(File.get_join_path(settings.TASK_SCRIPT_DIR, old_project_path, instance.file_name),
+                           File.get_join_path(settings.TASK_SCRIPT_DIR, new_project_path, instance.file_name))
             data['src_user'] = self.get_user(request)
             serializer = self.get_serializer(instance, data=data, partial=partial)
             serializer.is_valid(raise_exception=True)
@@ -62,10 +60,9 @@ class ScriptFileViewSet(Base):
     def script_detail(self, request, pk):
         try:
             instance = self.get_object()
-            abs_file = os.path.join(settings.TASK_SCRIPT_DIR, instance.project.path, instance.file_name)
-            if os.path.isfile(abs_file):
-                file_obj = pathlib.Path(abs_file)
-                file_content = file_obj.read_text(encoding='utf-8')
+            abs_file = File.get_join_path(settings.TASK_SCRIPT_DIR, instance.project.path, instance.file_name)
+            if File.if_file_exists(abs_file):
+                file_content = File.read_file(abs_file)
 
                 return json_ok_response(
                     data={'id': instance.id, 'file_name': instance.file_name, 'content': file_content})
@@ -81,14 +78,13 @@ class ScriptFileViewSet(Base):
             content = request.data.get('content')
             file_name = request.data.get('file_name')
             if file_name.endswith('.sh') or file_name.endswith('.py'):
-                old_abs_file = os.path.join(settings.TASK_SCRIPT_DIR, instance.project.path, instance.file_name)
-                new_abs_file = os.path.join(settings.TASK_SCRIPT_DIR, instance.project.path, file_name)
-                os.remove(old_abs_file)
-                file_obj = pathlib.Path(new_abs_file)
+                old_abs_file = File.get_join_path(settings.TASK_SCRIPT_DIR, instance.project.path, instance.file_name)
+                new_abs_file = File.get_join_path(settings.TASK_SCRIPT_DIR, instance.project.path, file_name)
+                File.rm_dir(old_abs_file)
                 instance.file_name = file_name
                 instance.src_user = self.get_user(request)
                 instance.save()
-                file_obj.write_text(content, encoding='utf-8')
+                File.write_file(new_abs_file, content)
                 return json_ok_response(data='文件更新成功')
             else:
                 return json_error_response(message='文件名不合法，暂只支持 .sh/.py 结尾文件。')
@@ -100,11 +96,11 @@ class ScriptFileViewSet(Base):
         try:
             instance = self.get_object()
             project_path = instance.project.path
-            abs_path = os.path.join(settings.TASK_RECYCLE_BIN, 'script', project_path, str(datetime.date.today()))
-            old_abs_file = os.path.join(settings.TASK_SCRIPT_DIR, project_path, instance.file_name)
+            abs_path = File.get_join_path(settings.TASK_RECYCLE_BIN, 'script', project_path, str(datetime.date.today()))
+            old_abs_file = File.get_join_path(settings.TASK_SCRIPT_DIR, project_path, instance.file_name)
 
-            if not os.path.exists(abs_path):
-                os.makedirs(abs_path)
+            if not File.if_dir_exists(abs_path):
+                File.create_dirs(abs_path)
 
             TaskRecycle.objects.create(
                 task_type=0,
@@ -115,7 +111,7 @@ class ScriptFileViewSet(Base):
                 source_project_name=instance.project.name,
                 path=str(datetime.date.today())
             )
-            shutil.move(old_abs_file, abs_path)
+            File.move_file(old_abs_file, abs_path)
             instance.delete()
             return json_ok_response()
         except Exception as e:

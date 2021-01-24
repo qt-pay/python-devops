@@ -1,5 +1,4 @@
 # 定时任务
-import os
 import uuid
 
 from .BaseViewSet import Base
@@ -7,6 +6,7 @@ from .crontab_def import add_ansible_crontab, add_ssh_crontab
 from ..models import TaskCrontab, ScriptFile, AnsiblePlaybook
 from ..serializers import TaskCrontabSerializer
 from base.response import json_ok_response, json_error_response
+from common.file import File
 
 from django.conf import settings
 
@@ -31,14 +31,15 @@ class TaskCrontabViewSet(Base):
         try:
             if data['task_lib'] == 'script':
                 script_obj = ScriptFile.objects.filter(id=data['script_id']).first()
-                abs_file = os.path.join(settings.TASK_SCRIPT_DIR, script_obj.project.path, script_obj.file_name)
+                abs_file = File.get_join_path(settings.TASK_SCRIPT_DIR, script_obj.project.path, script_obj.file_name)
             else:
                 script_obj = AnsiblePlaybook.objects.filter(id=data['script_id']).first()
                 if script_obj.file_name.endswith('yaml'):
-                    abs_file = os.path.join(settings.TASK_SCRIPT_DIR, script_obj.project.path, script_obj.file_name)
+                    abs_file = File.get_join_path(settings.TASK_SCRIPT_DIR, script_obj.project.path,
+                                                  script_obj.file_name)
                 else:
-                    abs_file = f'{os.path.join(settings.TASK_SCRIPT_DIR, script_obj.project.path)}{script_obj.file_name}'
-            if not os.path.isfile(abs_file):
+                    abs_file = f'{File.get_join_path(settings.TASK_SCRIPT_DIR, script_obj.project.path)}{script_obj.file_name}'
+            if not File.if_file_exists(abs_file):
                 return json_error_response(message='所选文件找不到请检查后重试。')
 
             if data['run_type'] == 'ansible':

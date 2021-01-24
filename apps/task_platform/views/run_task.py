@@ -1,12 +1,10 @@
-import os
-import pathlib
-
 from .BaseViewSet import Base
 from ..models import ScriptFile, ScriptProject, AnsiblePlaybook
+from base.response import json_ok_response, json_error_response
+from common.file import File
 from my_celery.playbook_task.taks import ploybook_task
 from my_celery.paramiko_task.tasks import paramiko_ssh_task
 from my_celery.script_task.tasks import script_task
-from base.response import json_ok_response, json_error_response
 
 from django.conf import settings
 
@@ -18,9 +16,9 @@ class ExecViewSet(Base):
             data = request.data
             if data['script_source'] == 'library':
                 script_file_obj = ScriptFile.objects.filter(id=data['script_id']).first()
-                abs_file = os.path.join(settings.TASK_SCRIPT_DIR, script_file_obj.project.path,
-                                        script_file_obj.file_name)
-                if not os.path.join(abs_file):
+                abs_file = File.get_join_path(settings.TASK_SCRIPT_DIR, script_file_obj.project.path,
+                                              script_file_obj.file_name)
+                if not File.if_file_exists(abs_file):
                     return json_error_response(message=f'脚本库中找不到脚本名为{script_file_obj.file_name}的脚本')
             else:
                 project_obj = ScriptProject.objects.filter(path='temp').first()
@@ -28,12 +26,11 @@ class ExecViewSet(Base):
                     return json_error_response(message='项目找不到，请创建路径为temp的项目。')
 
                 file_name = f"{data['name']}.{data['script_extension']}"
-                abs_file = os.path.join(settings.TASK_SCRIPT_DIR, 'temp', file_name)
-                if os.path.exists(abs_file):
+                abs_file = File.get_join_path(settings.TASK_SCRIPT_DIR, 'temp', file_name)
+                if File.if_dir_exists(abs_file):
                     return json_error_response(message='请更换任务名')
-                file_obj = pathlib.Path(abs_file)
-                file_obj.touch(mode=0o755)
-                file_obj.write_text(data['script_content'])
+
+                File.write_file(abs_file, data['script_content'])
 
                 new_data = {
                     'name': data['name'],
@@ -62,12 +59,13 @@ class ExecViewSet(Base):
             data = request.data
             playbook_obj = AnsiblePlaybook.objects.filter(id=data['playbook_id']).first()
             print(playbook_obj.file_name)
-            if playbook_obj.file_name.endswith('yaml'):
-                abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, playbook_obj.project.path, playbook_obj.file_name)
+            if File.if_file_endswith(playbook_obj.file_name, 'yaml'):
+                abs_file = File.get_join_path(settings.TASK_PLAYBOOK_DIR, playbook_obj.project.path,
+                                              playbook_obj.file_name)
             else:
-                abs_file = f'{os.path.join(settings.TASK_PLAYBOOK_DIR, playbook_obj.project.path)}{playbook_obj.file_name}'
+                abs_file = f'{File.get_join_path(settings.TASK_PLAYBOOK_DIR, playbook_obj.project.path)}{playbook_obj.file_name}'
             print(abs_file)
-            if not os.path.isfile(abs_file):
+            if not File.if_file_exists(abs_file):
                 return json_error_response(message='所选项目或文件找不到')
             cmd = self.playbook_cmd(abs_file, data)
             result = ploybook_task.delay(cmd)
@@ -83,14 +81,14 @@ class ExecViewSet(Base):
             data = request.data
             if data['lib_type'] == 'script':
                 script_obj = ScriptFile.objects.filter(id=data['script_id']).first()
-                abs_file = os.path.join(settings.TASK_SCRIPT_DIR, script_obj.project.path, script_obj.file_name)
+                abs_file = File.get_join_path(settings.TASK_SCRIPT_DIR, script_obj.project.path, script_obj.file_name)
             else:
                 playbook_obj = AnsiblePlaybook.objects.filter(id=data['script_id']).first()
-                if playbook_obj.file_name.endswith('yaml'):
-                    abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, playbook_obj.project.path,
-                                            script_task.file_name)
+                if File.if_file_endswith(playbook_obj.file_name, 'yaml'):
+                    abs_file = File.get_join_path(settings.TASK_PLAYBOOK_DIR, playbook_obj.project.path,
+                                                  script_task.file_name)
                 else:
-                    abs_file = f'{os.path.join(settings.TASK_PLAYBOOK_DIR, playbook_obj.project.path)}{script_task.file_name}'
+                    abs_file = f'{File.get_join_path(settings.TASK_PLAYBOOK_DIR, playbook_obj.project.path)}{script_task.file_name}'
 
             if data['run_type'] == 'ansible':
                 cmd = self.async_script_cmd(abs_file, data)

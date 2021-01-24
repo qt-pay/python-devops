@@ -1,12 +1,10 @@
-import os
-import shutil
-import pathlib
 import datetime
 
 from .BaseViewSet import Base
 from ..models import AnsiblePlaybook, AnsibleProject, TaskRecycle
 from ..serializers import AnsiblePlaybookSerializer
 from base.response import json_ok_response, json_error_response
+from common.file import File
 
 from django.conf import settings
 from rest_framework.decorators import action
@@ -22,10 +20,10 @@ class AnsiblePlaybookViewSet(Base):
     def create(self, request, *args, **kwargs):
         try:
             data = request.data
-            save_file_info = self.playbook_save(data)
-            if not save_file_info['status']:
-                return json_error_response(message=save_file_info['data'])
-            data['file_name'] = save_file_info['data']
+            file_name, status = self.playbook_save(data)
+            if not status:
+                return json_error_response(message=data)
+            data['file_name'] = file_name
             data['src_user'] = self.get_user(request)
             serializer = self.get_serializer(data=data)
             serializer.is_valid(raise_exception=True)
@@ -45,16 +43,18 @@ class AnsiblePlaybookViewSet(Base):
             instance = self.get_object()
             old_project_path = instance.project.path
             new_project_path = project_obj.path
-            if os.path.exists(os.path.join(settings.TASK_PLAYBOOK_DIR, new_project_path, instance.file_name)):
+            if File.if_file_exists(File.get_join_path(settings.TASK_PLAYBOOK_DIR,
+                                                      new_project_path,
+                                                      instance.file_name)):
                 return json_error_response(message='新项目中已经存在同名脚本，请检查后重试。')
 
-            if instance.file_name.endswith('.yaml'):
-                shutil.move(os.path.join(settings.TASK_PLAYBOOK_DIR, old_project_path, instance.file_name),
-                            os.path.join(settings.TASK_PLAYBOOK_DIR, new_project_path, ))
+            if File.if_file_endswith(instance.file_name, '.yaml'):
+                File.move_file(File.get_join_path(settings.TASK_PLAYBOOK_DIR, old_project_path, instance.file_name),
+                               File.get_join_path(settings.TASK_PLAYBOOK_DIR, new_project_path, ))
             else:
-                shutil.move(
-                    os.path.join(settings.TASK_PLAYBOOK_DIR, old_project_path, instance.file_name.split('/')[1]),
-                    os.path.join(settings.TASK_PLAYBOOK_DIR, new_project_path, ))
+                File.move_file(
+                    File.get_join_path(settings.TASK_PLAYBOOK_DIR, old_project_path, instance.file_name.split('/')[1]),
+                    File.get_join_path(settings.TASK_PLAYBOOK_DIR, new_project_path, ))
 
             serializer = self.get_serializer(instance, data=data, partial=partial)
             serializer.is_valid(raise_exception=True)
@@ -63,19 +63,18 @@ class AnsiblePlaybookViewSet(Base):
                 instance._prefetched_objects_cache = {}
             return json_ok_response(data=serializer.data)
         except Exception as e:
-            return json_error_response(message=str(e), )
+            return json_error_response(message=str(e))
 
     @action(methods=['get'], detail=True)
     def playbook_detail(self, request, pk):
         try:
             instance = self.get_object()
-            if instance.file_name.endswith('.yaml'):
-                abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, instance.project.path, instance.file_name)
+            if File.if_file_endswith(instance.file_name, '.yaml'):
+                abs_file = File.get_join_path(settings.TASK_PLAYBOOK_DIR, instance.project.path, instance.file_name)
             else:
-                abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, instance.project.path, ) + instance.file_name
-            if os.path.isfile(abs_file):
-                file_obj = pathlib.Path(abs_file)
-                file_content = file_obj.read_text(encoding='utf-8')
+                abs_file = File.get_join_path(settings.TASK_PLAYBOOK_DIR, instance.project.path, ) + instance.file_name
+            if File.if_file_exists(abs_file):
+                file_content = File.read_file(abs_file)
 
                 return json_ok_response(
                     data={'id': instance.id, 'file_name': instance.file_name, 'content': file_content})
@@ -90,18 +89,18 @@ class AnsiblePlaybookViewSet(Base):
             instance = self.get_object()
             content = request.data.get('content')
             file_name = request.data.get('file_name')
-            if file_name.endswith('.yaml'):
-                old_abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, instance.project.path, instance.file_name)
-                new_abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, instance.project.path, file_name)
-                os.remove(old_abs_file)
+            if File.if_file_endswith(file_name, '.yaml'):
+                old_abs_file = File.get_join_path(settings.TASK_PLAYBOOK_DIR, instance.project.path, instance.file_name)
+                new_abs_file = File.get_join_path(settings.TASK_PLAYBOOK_DIR, instance.project.path, file_name)
+                File.rm_dir(old_abs_file)
                 instance.file_name = file_name
-            elif file_name.endswith('.yml'):
-                new_abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, instance.project.path, ) + instance.file_name
-                os.remove(new_abs_file)
+            elif File.if_file_endswith(file_name, '.yml'):
+                new_abs_file = File.get_join_path(settings.TASK_PLAYBOOK_DIR,
+                                                  instance.project.path, ) + instance.file_name
+                File.rm_dir(new_abs_file)
             else:
                 return json_error_response(message='文件名不合法，暂只支持 .yaml 结尾文件。')
-            file_obj = pathlib.Path(new_abs_file)
-            file_obj.write_text(content, encoding='utf-8')
+            File.write_file(new_abs_file, content)
             instance.src_user = self.get_user(request)
             instance.save()
             return json_ok_response(data='文件更新成功')
@@ -113,9 +112,10 @@ class AnsiblePlaybookViewSet(Base):
         try:
             instance = self.get_object()
             project_path = instance.project.path
-            abs_path = os.path.join(settings.TASK_RECYCLE_BIN, 'playbook', project_path, str(datetime.date.today()))
-            if not os.path.exists(abs_path):
-                os.makedirs(abs_path)
+            abs_path = File.get_join_path(settings.TASK_RECYCLE_BIN, 'playbook', project_path,
+                                          str(datetime.date.today()))
+            if not File.if_file_exists(abs_path):
+                File.create_dirs(abs_path)
             TaskRecycle.objects.create(
                 task_type=1,
                 src_user=self.get_user(request),
@@ -125,11 +125,12 @@ class AnsiblePlaybookViewSet(Base):
                 source_project_name=instance.project.name,
                 path=str(datetime.date.today())
             )
-            if instance.file_name.endswith('.yaml'):
-                old_abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, project_path, instance.file_name)
-            elif instance.file_name.endswith('.yml'):
-                old_abs_file = os.path.join(settings.TASK_PLAYBOOK_DIR, project_path, instance.file_name.split('/')[1])
-            shutil.move(old_abs_file, abs_path)
+            if File.if_file_endswith(instance.file_name, '.yaml'):
+                old_abs_file = File.get_join_path(settings.TASK_PLAYBOOK_DIR, project_path, instance.file_name)
+            else:
+                old_abs_file = File.get_join_path(settings.TASK_PLAYBOOK_DIR, project_path,
+                                                  instance.file_name.split('/')[1])
+            File.move_file(old_abs_file, abs_path)
             instance.delete()
             return json_ok_response()
         except Exception as e:

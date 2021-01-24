@@ -1,13 +1,11 @@
-import os
 import tarfile
 import zipfile
-import shutil
 
 from ..models import TaskHistory, ScriptProject, AnsibleProject, AnsibleParameter
-
 from base.views import BaseModelViewSet
 from common.get_config_value import get_value
 from common.random_str import random_str
+from common.file import File
 from apps.rbac.auth.jwt_auth import analysis_token
 from my_celery.run import app
 
@@ -21,9 +19,9 @@ class Base(BaseModelViewSet):
         list = []
         ramdom_str = random_str()
         ansible = get_value("ansible", "abs_ansible_command")
-        remote_file_path = f'/tmp/{os.path.basename(abs_file)}-{ramdom_str}'
+        remote_file_path = f'/tmp/{File.get_file_name(abs_file)}-{ramdom_str}'
         copy_file_cmd = f'{ansible} {data["middle_host"][0]} -m copy -a "src={abs_file} dest={remote_file_path} mode=0777"'
-        if abs_file.endswith('.sh'):
+        if File.if_file_endswith(abs_file, '.sh'):
             list.append(
                 f'''ansible {",".join(data["target_host"])} -m script -a "{remote_file_path} {data["task_args"]}" && rm -rf {remote_file_path} ''')
         else:
@@ -38,9 +36,9 @@ class Base(BaseModelViewSet):
     def async_script_cmd(self, abs_file, data):
         ramdom_str = random_str()
         ansible = get_value("ansible", "abs_ansible_command")
-        remote_file_path = f'/tmp/{os.path.basename(abs_file)}-{ramdom_str}'
+        remote_file_path = f'/tmp/{File.get_file_name(abs_file)}-{ramdom_str}'
         copy_file_cmd = f'{ansible} {data["middle_host"][0]} -m copy -a "src={abs_file} dest={remote_file_path} mode=0777"'
-        if abs_file.endswith('.sh'):
+        if File.if_file_endswith(abs_file, '.sh'):
             remote_cmd = f'''{ansible} {data["middle_host"][0]} -m shell -a 'ansible {",".join(data["target_host"])} -m script -a "{remote_file_path} {data["task_args"]}" && rm -rf {remote_file_path}' '''
         else:
             if not data["task_args"]:
@@ -55,9 +53,9 @@ class Base(BaseModelViewSet):
         file_name = abs_file_path.split('/')[-1]
         remote_file_path = f'/tmp/{file_name}-{ramdom_str}'
         ''' 调用 celery paramiko'''
-        if file_name.endswith('.sh'):
+        if File.if_file_endswith(file_name, '.sh'):
             command = f'bash {remote_file_path}  {data["task_args"]} && rm -rf {remote_file_path}'
-        elif file_name.endswith('.py'):
+        else:
             command = f'python {remote_file_path} {data["task_args"]} && rm -rf {remote_file_path}'
         list.append(command)
         list.append(remote_file_path)
@@ -66,24 +64,24 @@ class Base(BaseModelViewSet):
     def ansible_cmd(self, abs_file_path, data):
         ansible = get_value("ansible", "abs_ansible_command")
         ansible_playbook = get_value("ansible", "abs_playbook_command")
-        if abs_file_path.endswith('.sh'):
+        if File.if_file_endswith(abs_file_path, '.sh'):
             return f"{ansible} {','.join(data['task_host_list'])} -m script -a '{abs_file_path} {data['task_args']}'"
-        elif abs_file_path.endswith('.py'):
+        elif File.if_file_endswith(abs_file_path, '.py'):
             ramdom_str = random_str()
             file_name = abs_file_path.split('/')[-1]
             remote_file_path = f'/tmp/{file_name}-{ramdom_str}'
             copy_file_cmd = f'ansible {",".join(data["task_host_list"])} -m copy -a "src={abs_file_path} dest={remote_file_path} mode=766" '
             exec_cmd = f'ansible {",".join(data["task_host_list"])} -m shell -a "chdir=/tmp/ .{remote_file_path} {data["task_args"]} && rm -f {remote_file_path}"  '
             return f'{copy_file_cmd} && {exec_cmd}'
-        elif abs_file_path.endswith('yaml') or abs_file_path.endswith('yml'):
+        elif File.if_file_endswith(abs_file_path, '.yaml') or File.if_file_endswith(abs_file_path, '.yml'):
             if data['hosts_file']:
-                if os.path.isfile(get_value('ansible', 'ansible_host_path')):
+                if File.if_file_exists(get_value('ansible', 'ansible_host_path')):
                     hosts_file_path = get_value('ansible', 'ansible_host_path')
                 else:
-                    hosts_file_path = os.path.join(get_value('ansible', 'ansible_host_path'), data['hosts_file'])
+                    hosts_file_path = File.get_join_path(get_value('ansible', 'ansible_host_path'), data['hosts_file'])
             else:
                 hosts_file_path = data['hosts_file']
-            if os.path.isfile(abs_file_path):
+            if File.if_file_exists(abs_file_path):
                 if not hosts_file_path and not data['task_args']:
                     return f'{ansible_playbook} {abs_file_path} -v  '
                 elif not hosts_file_path:
@@ -98,10 +96,10 @@ class Base(BaseModelViewSet):
         try:
             playbook_command = get_value("ansible", "abs_playbook_command")
             if data['host_file']:
-                if os.path.isfile(get_value('ansible', 'ansible_host_path')):
+                if File.if_file_exists(get_value('ansible', 'ansible_host_path')):
                     hosts_file_path = get_value('ansible', 'ansible_host_path')
                 else:
-                    hosts_file_path = os.path.join(get_value('ansible', 'ansible_host_path'), data['host_file'])
+                    hosts_file_path = File.get_join_path(get_value('ansible', 'ansible_host_path'), data['host_file'])
             else:
                 hosts_file_path = data['host_file']
             if data['parameter_id']:
@@ -123,10 +121,10 @@ class Base(BaseModelViewSet):
 
     def __abs_file(self, type, project, file):
         if type == 'playbook':
-            return os.path.join(settings.TASK_PLAYBOOK_DIR, project, file)
+            return File.get_join_path(settings.TASK_PLAYBOOK_DIR, project, file)
         elif type == 'script':
             # if source:
-            return os.path.join(settings.TASK_SCRIPT_DIR, project, file)
+            return File.get_join_path(settings.TASK_SCRIPT_DIR, project, file)
 
     def record_log(self, request, task_name, abs_file, result_id, task_host_list, task_type, run_type):
         if 'HTTP_X_FORWARDED_FOR' in request.META:
@@ -155,10 +153,10 @@ class Base(BaseModelViewSet):
         res_dict = {'status': True, 'data': ''}
         script_file = data['sctiptFile']
         project_obj = ScriptProject.objects.filter(id=data['project']).first()
-        abs_file_path = os.path.join(settings.TASK_SCRIPT_DIR, project_obj.path, script_file.name)
+        abs_file_path = File.get_join_path(settings.TASK_SCRIPT_DIR, project_obj.path, script_file.name)
         try:
             if script_file.name.endswith('.sh') or script_file.name.endswith('.py'):
-                if os.path.exists(abs_file_path):
+                if File.if_dir_exists(abs_file_path):
                     res_dict['status'] = False
                     res_dict['data'] = '脚本文件已经存在请检查后在上传!。'
                     return res_dict
@@ -172,40 +170,33 @@ class Base(BaseModelViewSet):
                 f.flush()
             res_dict['data'] = script_file.name
         except Exception as e:
-            if os.path.isfile(abs_file_path):
-                os.remove(abs_file_path)
+            if File.if_file_exists(abs_file_path):
+                File.rm_dir(abs_file_path)
             res_dict['status'] = False
             res_dict['data'] = str(e)
         return res_dict
 
     def playbook_save(self, data):
-        res_dict = {'status': True, 'data': ''}
         try:
             script_file = data['sctiptFile']
             project_obj = AnsibleProject.objects.filter(id=data['project']).first()
             if script_file.name.endswith('.yaml'):
-                abs_file_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project_obj.path, script_file.name)
-                if os.path.exists(abs_file_path):
-                    res_dict['status'] = False
-                    res_dict['data'] = f'{project_obj.name} 项目中已经存在此剧本请检查后重试!'
-                    return res_dict
+                abs_file_path = File.get_join_path(settings.TASK_PLAYBOOK_DIR, project_obj.path, script_file.name)
+                if File.if_dir_exists(abs_file_path):
+                    return f'{project_obj.name} 项目中已经存在此剧本请检查后重试!', False
+
             elif script_file.name.endswith('.tar.gz'):
-                abs_file_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project_obj.path, script_file.name)
-                if os.path.exists(abs_file_path.split('.tar.gz')[0]):
-                    res_dict['status'] = False
-                    res_dict['data'] = f'{project_obj.name} 项目中已经存在此角色包请检查后重试!'
-                    return res_dict
+                abs_file_path = File.get_join_path(settings.TASK_PLAYBOOK_DIR, project_obj.path, script_file.name)
+                if File.if_dir_exists(abs_file_path.split('.tar.gz')[0]):
+                    return f'{project_obj.name} 项目中已经存在此角色包请检查后重试!', False
 
             elif script_file.name.endswith('.zip'):
-                abs_file_path = os.path.join(settings.TASK_PLAYBOOK_DIR, project_obj.path, script_file.name)
-                if os.path.exists(abs_file_path.split('.zip')[0]):
-                    res_dict['status'] = False
-                    res_dict['data'] = f'{project_obj.name} 项目中已经存在此角色包请检查后重试!'
-                    return res_dict
+                abs_file_path = File.get_join_path(settings.TASK_PLAYBOOK_DIR, project_obj.path, script_file.name)
+                if File.if_dir_exists(abs_file_path.split('.zip')[0]):
+                    return f'{project_obj.name} 项目中已经存在此角色包请检查后重试!', False
             else:
-                res_dict['status'] = False
-                res_dict['data'] = 'PlayBook 文件上传暂只支持，.yaml/.zip/.tar.gz结尾文件。'
-                return res_dict
+                return 'PlayBook 文件上传暂只支持，.yaml/.zip/.tar.gz结尾文件。', False
+
             # # 保存压缩包或者文件
             with open(abs_file_path, 'wb') as f:
                 for chunk in script_file.chunks():
@@ -216,73 +207,57 @@ class Base(BaseModelViewSet):
             if abs_file_path.endswith('.zip'):
                 return self.__un_zip(abs_file_path)
             # 文件直接返回file名
-            res_dict['data'] = script_file.name
-            return res_dict
+            return script_file.name, False
         except Exception as e:
-            res_dict['status'] = False
-            res_dict['data'] = str(e)
-            return res_dict
+            return str(e), False
 
     def __un_tar(self, abs_package):
-        res_dict = {'status': True, 'data': ''}
         try:
             # untar zip file"""
             base_dir = abs_package.split('.tar.gz')[0]
-            dir_name = os.path.basename(abs_package).split('.tar.gz')[0]
+            dir_name = File.get_file_name(abs_package).split('.tar.gz')[0]
             tar = tarfile.open(abs_package)
             names = tar.getnames()
-            os.mkdir(base_dir)
+            File.create_dirs(base_dir)
             # 因为解压后是很多文件，预先建立同名目录
             for name in names:
                 tar.extract(name, base_dir)
             tar.close()
-            os.remove(abs_package)
-            if os.path.isfile(os.path.join(base_dir, 'deploy.yml')):
-                res_dict['data'] = f'/{dir_name}/deploy.yml'
-                return res_dict
-            elif os.path.isfile(os.path.join(base_dir, dir_name, 'deploy.yml')):
-                res_dict['data'] = f'/{dir_name}/{dir_name}/deploy.yml'
-                return res_dict
+            File.rm_dir(abs_package)
+            if File.if_file_exists(File.get_join_path(base_dir, 'deploy.yml')):
+                return f'/{dir_name}/deploy.yml', True
+            elif File.if_file_exists(File.get_join_path(base_dir, dir_name, 'deploy.yml')):
+
+                return f'/{dir_name}/{dir_name}/deploy.yml', True
             else:
-                res_dict['status'] = False
-                res_dict['data'] = '剧本包格式上传不正确，入口文件格式： 包名/deploy.yml'
-                shutil.rmtree(base_dir)
-                return res_dict
+                File.rm_dirs(base_dir)
+                return '剧本包格式上传不正确，入口文件格式： 包名/deploy.yml', False
         except Exception:
-            os.remove(abs_package)
-            res_dict['status'] = False
-            res_dict['data'] = '请检查文件是否损坏，无法解压。'
-            return res_dict
+            File.rm_dir(abs_package)
+            return '请检查文件是否损坏，无法解压。', False
 
     def __un_zip(self, abs_package):
-        res_dict = {'status': True, 'data': ''}
         try:
             # untar zip file"""
             base_dir = abs_package.split('.zip')[0]
-            dir_name = os.path.basename(abs_package).split('.zip')[0]
+            dir_name = File.get_file_name(abs_package).split('.zip')[0]
             zip_file = zipfile.ZipFile(abs_package)
-            os.mkdir(base_dir)
+            File.rm_dir(base_dir)
             # 因为解压后是很多文件，预先建立同名目录
             for names in zip_file.namelist():
                 zip_file.extract(names, base_dir)
             zip_file.close()
-            os.remove(abs_package)
-            if os.path.isfile(os.path.join(base_dir, 'deploy.yml')):
-                res_dict['data'] = f'/{dir_name}/deploy.yml'
-                return res_dict
-            elif os.path.isfile(os.path.join(base_dir, dir_name, 'deploy.yml')):
-                res_dict['data'] = f'/{dir_name}/{dir_name}/deploy.yml'
-                return res_dict
+            File.rm_dir(abs_package)
+            if File.if_file_exists(File.get_join_path(base_dir, 'deploy.yml')):
+                return f'/{dir_name}/deploy.yml', True
+            elif File.if_file_exists(File.get_join_path(base_dir, dir_name, 'deploy.yml')):
+                return f'/{dir_name}/{dir_name}/deploy.yml', True
             else:
-                res_dict['status'] = False
-                res_dict['data'] = '剧本包格式上传不正确，入口文件格式： 包名/deploy.yml'
-                shutil.rmtree(base_dir)
-                return res_dict
+                File.rm_dirs(base_dir)
+                return '剧本包格式上传不正确，入口文件格式： 包名/deploy.yml', False
         except Exception:
-            os.remove(abs_package)
-            res_dict['status'] = False
-            res_dict['data'] = '请检查文件是否损坏，无法解压。'
-            return res_dict
+            File.rm_dir(abs_package)
+            return '请检查文件是否损坏，无法解压。', False
 
     def get_user(self, request):
         if analysis_token(request)['user_info']['username']:
